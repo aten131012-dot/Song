@@ -1,0 +1,122 @@
+local Players = game:GetService("Players")
+local SoundService = game:GetService("SoundService")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+if playerGui:FindFirstChild("NovaHubGui") then playerGui.NovaHubGui:Destroy() end
+
+local screenGui = Instance.new("ScreenGui", playerGui); screenGui.Name = "NovaHubGui"
+local activeSounds = {}; local isLooped = false
+local rainbowElements = {}
+
+-- ฟังก์ชันจัดการเสียง
+local function stopAllSounds()
+    for _, s in ipairs(activeSounds) do if s then pcall(function() s:Stop() s:Destroy() end) end end
+    activeSounds = {}
+end
+
+local function playErrorSound()
+    local err = Instance.new("Sound", SoundService)
+    err.SoundId = "rbxassetid://142323386"
+    err.Volume = 5; err:Play(); task.delay(2, function() err:Destroy() end)
+end
+
+-- ฟังก์ชันสร้างปุ่มและ UI
+local function createBtn(parent, text, size, color)
+    local btn = Instance.new("TextButton", parent)
+    btn.Size = size; btn.Text = text; btn.BackgroundColor3 = color or Color3.fromRGB(40, 40, 60)
+    btn.TextColor3 = Color3.new(1,1,1); btn.Font = Enum.Font.SourceSansBold; btn.TextSize = 14
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+    table.insert(rainbowElements, btn)
+    return btn
+end
+
+-- UI หลัก
+local miniBtn = Instance.new("TextButton", screenGui)
+miniBtn.Size = UDim2.new(0, 50, 0, 50); miniBtn.Position = UDim2.new(0.05, 0, 0.2, 0)
+miniBtn.Text = "N"; miniBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+Instance.new("UICorner", miniBtn).CornerRadius = UDim.new(1, 0)
+table.insert(rainbowElements, miniBtn)
+miniBtn.Draggable = true
+
+local mainFrame = Instance.new("Frame", screenGui); mainFrame.Size = UDim2.new(0, 600, 0, 350); mainFrame.Position = UDim2.new(0.5, -300, 0.5, -175)
+mainFrame.BackgroundColor3 = Color3.fromRGB(24, 22, 34); mainFrame.Visible = false; mainFrame.Active = true; mainFrame.Draggable = true
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 10)
+miniBtn.MouseButton1Click:Connect(function() mainFrame.Visible = not mainFrame.Visible end)
+
+-- เอฟเฟกต์สีรุ้ง
+RunService.RenderStepped:Connect(function()
+    local c = Color3.fromHSV((tick() % 3) / 3, 0.8, 1)
+    for _, el in ipairs(rainbowElements) do el.TextColor3 = c end
+end)
+
+-- Sidebar และ Content
+local sidebar = Instance.new("Frame", mainFrame); sidebar.Size = UDim2.new(0, 140, 1, -10); sidebar.Position = UDim2.new(0, 10, 0, 5); sidebar.BackgroundTransparency = 1
+Instance.new("UIListLayout", sidebar).Padding = UDim.new(0, 5)
+
+local content = Instance.new("Frame", mainFrame); content.Size = UDim2.new(1, -160, 1, -10); content.Position = UDim2.new(0, 155, 0, 5); content.BackgroundTransparency = 1
+
+local function createPage() 
+    local p = Instance.new("ScrollingFrame", content); p.Size = UDim2.new(1, 0, 1, 0); p.BackgroundTransparency = 1; p.Visible = false; p.ScrollBarThickness = 0
+    Instance.new("UIListLayout", p).Padding = UDim.new(0, 8)
+    return p 
+end
+
+local homePage = createPage(); homePage.Visible = true
+local customPage = createPage()
+local musicPage = createPage()
+
+-- 1. หน้าแรก
+createBtn(homePage, "📋 คัดลอก Discord", UDim2.new(1, -10, 0, 40)).MouseButton1Click:Connect(function() setclipboard("discord.gg/JwYuB8Tuz") end)
+
+-- 2. หน้า ID เพลง
+local statusLabel = Instance.new("TextLabel", customPage); statusLabel.Size = UDim2.new(1, -10, 0, 30); statusLabel.Text = "สถานะ: พร้อมใช้งาน"; statusLabel.BackgroundTransparency = 1; statusLabel.Font = Enum.Font.SourceSansBold
+table.insert(rainbowElements, statusLabel) 
+
+local idBox = Instance.new("TextBox", customPage); idBox.Size = UDim2.new(1, -10, 0, 40); idBox.PlaceholderText = "กรอก ID เพลง..."; idBox.BackgroundColor3 = Color3.fromRGB(45, 45, 60); idBox.TextColor3 = Color3.new(1,1,1); Instance.new("UICorner", idBox)
+local playBtn = createBtn(customPage, "▶️ เล่น", UDim2.new(1, -10, 0, 40))
+local stopBtn = createBtn(customPage, "⛔ หยุด", UDim2.new(1, -10, 0, 40), Color3.fromRGB(150, 40, 40))
+local loopBtn = createBtn(customPage, "🔁 ลูป: OFF", UDim2.new(1, -10, 0, 40), Color3.fromRGB(40, 100, 40))
+
+playBtn.MouseButton1Click:Connect(function()
+    stopAllSounds()
+    statusLabel.Text = "สถานะ: กำลังตรวจสอบ..."
+    local s = Instance.new("Sound", SoundService); s.SoundId = "rbxassetid://" .. idBox.Text; s.Looped = isLooped; s:Play()
+    table.insert(activeSounds, s)
+    task.wait(1.5)
+    if not s.IsLoaded or s.TimeLength == 0 then
+        statusLabel.Text = "สถานะ: เพลงใช้งานไม่ได้หรือติดลิขสิทธิ์"
+        playErrorSound()
+    else
+        statusLabel.Text = "สถานะ: กำลังเล่น"
+    end
+end)
+stopBtn.MouseButton1Click:Connect(stopAllSounds)
+loopBtn.MouseButton1Click:Connect(function() isLooped = not isLooped; loopBtn.Text = isLooped and "🔁 ลูป: ON" or "🔁 ลูป: OFF" end)
+
+-- 3. หน้าเพลง 1-6 (เพิ่มปุ่มหยุดและลูปเข้าไปที่ด้านบน)
+local stopBtnMusic = createBtn(musicPage, "⛔ หยุดเพลงทั้งหมด", UDim2.new(1, -10, 0, 40), Color3.fromRGB(150, 40, 40))
+stopBtnMusic.MouseButton1Click:Connect(stopAllSounds)
+
+local loopBtnMusic = createBtn(musicPage, "🔁 ลูป: OFF", UDim2.new(1, -10, 0, 40), Color3.fromRGB(40, 100, 40))
+loopBtnMusic.MouseButton1Click:Connect(function() 
+    isLooped = not isLooped
+    loopBtnMusic.Text = isLooped and "🔁 ลูป: ON" or "🔁 ลูป: OFF"
+    for _, s in ipairs(activeSounds) do s.Looped = isLooped end
+end)
+
+local songList = {{"1", "118315804375467"}, {"2", "1840692534"}, {"3", "128320250052591"}, {"4", "8072155067"}, {"5", "138067913531622"}, {"6", "105471345531768"}}
+for _, song in ipairs(songList) do
+    createBtn(musicPage, "🎵 เพลงที่ "..song[1], UDim2.new(1, -10, 0, 40)).MouseButton1Click:Connect(function()
+        stopAllSounds(); local s = Instance.new("Sound", SoundService); s.SoundId = "rbxassetid://" .. song[2]; s.Looped = isLooped; s:Play(); table.insert(activeSounds, s)
+    end)
+end
+
+-- ระบบ Sidebar
+local function addTab(name, page)
+    createBtn(sidebar, name, UDim2.new(1, 0, 0, 40)).MouseButton1Click:Connect(function() 
+        homePage.Visible=false; customPage.Visible=false; musicPage.Visible=false; page.Visible=true 
+    end)
+end
+addTab("🏠 หน้าหลัก", homePage); addTab("🎵 ไอดีเพลง", customPage); addTab("🎧 รายการเพลง", musicPage)
